@@ -153,15 +153,11 @@ int extract_min(BinHeap *h) {
     return min_key;
 }
 
-// === СОРТИРОВКА БИНОМИАЛЬНОЙ КУЧЕЙ ===
+
 void binomial_heap_sort(int arr[], int n) {
     BinHeap *h = create_heap();
-
-    // Вставка всех элементов (можно оптимизировать до O(n), но для простоты O(n log n))
     for (int i = 0; i < n; i++)
         insert(h, arr[i]);
-
-    // Извлечение по возрастанию
     for (int i = 0; i < n; i++)
         arr[i] = extract_min(h);
 }
