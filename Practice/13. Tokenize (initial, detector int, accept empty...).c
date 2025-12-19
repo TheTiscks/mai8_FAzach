@@ -13,46 +13,64 @@
 Обрабатываем все ошибки (NULL-параметры, malloc/realloc).
 */
 
-#include <stdarg.h>
+
+
 #include <stdlib.h>
 #include <string.h>
+
+static void cleanup(char ***lexems, size_t *lexems_count, char *buf) {
+    for (size_t i = 0; i < *lexems_count; i++) {
+        free((*lexems)[i]);
+    }
+    free(*lexems);
+    *lexems = NULL;
+    *lexems_count = 0;
+    free(buf);
+}
 
 int tokenize(char *initial,
              int (*detector)(int),
              int accept_empty_lexems,
              char ***lexems,
              size_t *lexems_count) {
-    // Проверки параметров
-    if (!initial || !detector || !lexems || !lexems_count) return -1;
-    if (!accept_empty_lexems && accept_empty_lexems != 0) return -1; // на всякий случай
+    if (!initial || !detector || !lexems || !lexems_count) {
+        return 1;
+    }
 
     *lexems = NULL;
     *lexems_count = 0;
     size_t capacity = 0;
 
-    char *buf = NULL;          // текущая лексема
+    char *buf = NULL;
     size_t buf_len = 0;
     size_t buf_cap = 0;
 
     const char *p = initial;
-    int prev_was_delim = 1;    // начало строки считаем как после разделителя
+    int prev_was_delim = 1;   // начало строки — как после разделителя
 
     while (*p) {
         int is_delim = (detector((unsigned char)*p) == 0);
 
         if (is_delim) {
-            // Завершаем текущую лексему, если она есть
+            // Завершаем текущую лексему (если нужно)
             if (buf_len > 0 || (accept_empty_lexems && !prev_was_delim)) {
-                // Добавляем лексему в результат
+                // Расширяем массив лексем
                 if (*lexems_count >= capacity) {
                     capacity = capacity ? capacity * 2 : 8;
                     char **tmp = realloc(*lexems, capacity * sizeof(char*));
-                    if (!tmp) goto mem_error;
+                    if (!tmp) {
+                        cleanup(lexems, lexems_count, buf);
+                        return 5;
+                    }
                     *lexems = tmp;
                 }
 
+                // Выделяем память под саму лексему
                 char *lex = malloc(buf_len + 1);
-                if (!lex) goto mem_error;
+                if (!lex) {
+                    cleanup(lexems, lexems_count, buf);
+                    return 5;
+                }
                 memcpy(lex, buf, buf_len);
                 lex[buf_len] = '\0';
 
@@ -66,7 +84,10 @@ int tokenize(char *initial,
             if (buf_len >= buf_cap) {
                 buf_cap = buf_cap ? buf_cap * 2 : 64;
                 char *tmp = realloc(buf, buf_cap);
-                if (!tmp) goto mem_error;
+                if (!tmp) {
+                    cleanup(lexems, lexems_count, buf);
+                    return 5;
+                }
                 buf = tmp;
             }
             buf[buf_len++] = *p;
@@ -75,17 +96,23 @@ int tokenize(char *initial,
         p++;
     }
 
-    // Последняя лексема после конца строки
+    // Обрабатываем последнюю лексему после конца строки
     if (buf_len > 0 || (accept_empty_lexems && !prev_was_delim)) {
         if (*lexems_count >= capacity) {
             capacity = capacity ? capacity * 2 : 8;
             char **tmp = realloc(*lexems, capacity * sizeof(char*));
-            if (!tmp) goto mem_error;
+            if (!tmp) {
+                cleanup(lexems, lexems_count, buf);
+                return 5;
+            }
             *lexems = tmp;
         }
 
         char *lex = malloc(buf_len + 1);
-        if (!lex) goto mem_error;
+        if (!lex) {
+            cleanup(lexems, lexems_count, buf);
+            return 5;
+        }
         memcpy(lex, buf, buf_len);
         lex[buf_len] = '\0';
 
@@ -94,16 +121,6 @@ int tokenize(char *initial,
 
     free(buf);
     return 0;
-
-mem_error:
-    // Освобождаем всё при ошибке памяти
-    for (size_t i = 0; i < *lexems_count; i++)
-        free((*lexems)[i]);
-    free(*lexems);
-    *lexems = NULL;
-    *lexems_count = 0;
-    free(buf);
-    return 5;
 }
 
 /* Пример использования */
