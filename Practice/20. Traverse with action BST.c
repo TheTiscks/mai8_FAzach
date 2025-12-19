@@ -48,27 +48,20 @@ int traverse_with_action(bst *tree, traverse_rule rule,
     if (!tree || !action) {
         return -1;
     }
-
     if (!tree->root) {
         return -2;  // пустое дерево
     }
-
     // Вспомогательная рекурсивная функция
     void traverse(bst_item *node, traverse_rule r, size_t depth) {
         if (!node) return;
-
         if (r == prefix) {
             action(node->key, node->value, depth);
         }
-
         traverse(node->left, r, depth + 1);
-
         if (r == infix) {
             action(node->key, node->value, depth);
         }
-
         traverse(node->right, r, depth + 1);
-
         if (r == postfix) {
             action(node->key, node->value, depth);
         }
