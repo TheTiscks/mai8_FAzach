@@ -1,15 +1,26 @@
 /*
-Считываем входной файл построчно, определяем rows и максимальное cols.
-Выделяем динамическую матрицу int** a размером rows × cols, заполняем нулями (calloc), читаем значения (недостающие остаются 0).
-Выводим размеры: rows cols.
-Находим для каждой строки минимальный элемент (row_min[i]).
-Находим для каждого столбца максимальный элемент (col_max[j]).
-Проходим по матрице: если a[i][j] == row_min[i] && a[i][j] == col_max[j] — это седловая точка → записываем в выходной файл строку i j (индексы с 0).
+Задача похожа на предыдущую седловую точку, но с двумя разными типами элементов:
+
+Элемент, который находится в одной строке с максимальным по модулю элементом матрицы (т.е. в строке, где |a[k][l]| — максимум во всей матрице).
+Элемент, который находится в одном столбце с минимальным элементом матрицы (т.е. в столбце, где a[p][q] — минимум во всей матрице).
+
+Нужно вывести в выходной файл индексы (i j, с 0) всех элементов матрицы, удовлетворяющих хотя бы одному из этих условий.
+Алгоритм:
+
+Два прохода по файлу: определяем размеры rows × max_cols.
+Выделяем и заполняем матрицу (недостающие = 0).
+Выводим rows cols в stdout.
+Находим:
+Максимум по модулю во всей матрице → индекс строки max_abs_row.
+Минимум во всей матрице → индекс столбца min_col.
+
+Проходим по матрице: если i == max_abs_rowилиj == min_col → записываем i j в выходной файл.
 */
+
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <math.h>   // для fabs, но можно без неё (используем a < 0 ? -a : a)
 
 int main(int argc, char **argv) {
     if (argc != 3) {
@@ -20,7 +31,7 @@ int main(int argc, char **argv) {
     FILE *in = fopen(argv[1], "r");
     if (!in) { perror("input"); return 1; }
 
-    // Первый проход — определяем размеры
+    // Первый проход — размеры
     char line[8192];
     int rows = 0, max_cols = 0;
     while (fgets(line, sizeof(line), in)) {
@@ -60,43 +71,52 @@ int main(int argc, char **argv) {
     // Выводим размеры
     printf("%d %d\n", rows, cols);
 
-    // min в строках, max в столбцах
-    int *row_min = malloc(rows * sizeof(int));
-    int *col_max = malloc(cols * sizeof(int));
+    // Находим строку с максимумом по модулю
+    int max_abs_val = 0;
+    int max_abs_row = 0;
+    // Находим минимум и его столбец
+    int min_val = a[0][0];
+    int min_col = 0;
 
-    for (int i = 0; i < rows; i++) {
-        row_min[i] = a[i][0];
-        for (int j = 1; j < cols; j++)
-            if (a[i][j] < row_min[i]) row_min[i] = a[i][j];
-    }
-    for (int j = 0; j < cols; j++) {
-        col_max[j] = a[j][0];
-        for (int i = 1; i < rows; i++)
-            if (a[i][j] > col_max[j]) col_max[j] = a[i][j];
-    }
-
-    // Записываем седловые точки в выходной файл
-    FILE *out = fopen(argv[2], "w");
-    if (!out) { perror("output"); return 1; }
-
-    int found = 0;
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            if (a[i][j] == row_min[i] && a[i][j] == col_max[j]) {
-                fprintf(out, "%d %d\n", i, j);
-                found = 1;
+            int val = a[i][j];
+            int abs_val = val < 0 ? -val : val;
+
+            if (i == 0 && j == 0) {
+                max_abs_val = abs_val;
+                min_val = val;
+                continue;
+            }
+
+            if (abs_val > max_abs_val) {
+                max_abs_val = abs_val;
+                max_abs_row = i;
+            }
+            if (val < min_val) {
+                min_val = val;
+                min_col = j;
             }
         }
     }
-    if (!found) fprintf(out, "none\n");  // часто требуют
+
+    // Записываем в выходной файл все подходящие элементы
+    FILE *out = fopen(argv[2], "w");
+    if (!out) { perror("output"); return 1; }
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            if (i == max_abs_row || j == min_col) {
+                fprintf(out, "%d %d\n", i, j);
+            }
+        }
+    }
 
     fclose(out);
 
     // Освобождение
     for (int i = 0; i < rows; i++) free(a[i]);
     free(a);
-    free(row_min);
-    free(col_max);
 
     return 0;
 }
